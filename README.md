@@ -111,7 +111,13 @@ curl -X POST \
 
 ## Free Always-On Hosting Recommendation
 
-For a site that should stay online without free-tier sleep, use an Oracle Cloud Always Free Ubuntu VPS rather than a sleeping PaaS free tier.
+For a site that should stay online without free-tier sleep, use a small always-on VM. For Google Cloud Free Tier, follow:
+
+```text
+DEPLOY_GCP_FREE_TIER.md
+```
+
+The generic VPS deployment shape is below.
 
 High-level deployment:
 
