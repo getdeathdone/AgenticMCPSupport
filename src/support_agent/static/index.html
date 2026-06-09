@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autonomous IT Support Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-label="IT support agent workspace">
+        <aside class="sidebar">
+          <div>
+            <p class="eyebrow">LangGraph + MCP + SQLite + Langfuse</p>
+            <h1>Autonomous IT Support Agent</h1>
+          </div>
+
+          <div class="status-grid" aria-label="System status">
+            <div>
+              <span>Router</span>
+              <strong>RAG or MCP</strong>
+            </div>
+            <div>
+              <span>Database</span>
+              <strong>support.db</strong>
+            </div>
+            <div>
+              <span>Tools</span>
+              <strong>4 MCP tools</strong>
+            </div>
+          </div>
+
+          <div class="examples" aria-label="Example prompts">
+            <button type="button" data-example="How do I troubleshoot VPN login?">
+              VPN runbook
+            </button>
+            <button type="button" data-example="What is the status of ticket #2041?">
+              Ticket #2041
+            </button>
+            <button type="button" data-example="Is Jira down right now?">
+              Jira status
+            </button>
+            <button type="button" data-example="Show devices for grace@example.com">
+              User devices
+            </button>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <nav class="tabs" aria-label="Views">
+            <button class="tab active" type="button" data-view="chat-view">Chat</button>
+            <button class="tab" type="button" data-view="database-view">Database</button>
+            <button class="tab" type="button" data-view="sources-view">Sources</button>
+          </nav>
+
+          <section id="chat-view" class="view active" aria-label="Agent chat">
+            <div id="messages" class="messages" aria-live="polite">
+              <article class="message agent">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                  Ask about VPN, Jira, email, support tickets, user devices, or troubleshooting steps. I will show the route and the data source used for the answer.
+                </div>
+              </article>
+            </div>
+
+            <form id="chat-form" class="composer">
+              <input
+                id="message-input"
+                name="message"
+                type="text"
+                autocomplete="off"
+                placeholder="Ask: What is the status of ticket #2041?"
+                maxlength="1000"
+                required
+              />
+              <button id="send-button" type="submit">Send</button>
+            </form>
+          </section>
+
+          <section id="database-view" class="view database-view" aria-label="SQLite database preview">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">SQLite preview</p>
+                <h2>Support Database</h2>
+                <p id="active-db" class="active-db">Active database: loading...</p>
+              </div>
+              <div class="database-controls">
+                <select id="table-select" aria-label="Select database table"></select>
+                <label class="file-button" for="db-upload">Upload DB</label>
+                <input id="db-upload" type="file" accept=".db,.sqlite,.sqlite3" />
+                <button id="default-db-button" type="button">Use default</button>
+              </div>
+            </header>
+            <div class="table-wrap">
+              <table id="data-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="sources-view" class="view sources-view" aria-label="Agent data sources">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">Data lineage</p>
+                <h2>Where Answers Come From</h2>
+              </div>
+            </header>
+
+            <div class="source-grid">
+              <article class="source-card">
+                <h3>RAG route</h3>
+                <p>General troubleshooting questions use the SQLite table <strong>knowledge_articles</strong>.</p>
+                <code>vpn, password, email, device runbooks</code>
+              </article>
+              <article class="source-card">
+                <h3>MCP ticket tool</h3>
+                <p>Ticket questions call <strong>get_ticket_status</strong> and read the <strong>tickets</strong> table.</p>
+                <code>What is ticket #2041?</code>
+              </article>
+              <article class="source-card">
+                <h3>MCP service tool</h3>
+                <p>Outage questions call <strong>get_service_status</strong> or <strong>search_known_incidents</strong>.</p>
+                <code>Is Jira down?</code>
+              </article>
+              <article class="source-card">
+                <h3>MCP device tool</h3>
+                <p>User device questions call <strong>get_user_devices</strong> and read endpoint inventory.</p>
+                <code>Show devices for grace@example.com</code>
+              </article>
+              <article class="source-card">
+                <h3>Fallbacks</h3>
+                <p>If a table, ticket, service, or MCP call fails, the graph routes to a safe support response.</p>
+                <code>retry or escalate to service desk</code>
+              </article>
+              <article class="source-card">
+                <h3>Observability</h3>
+                <p>Langfuse receives LangGraph callback traces with route, node timing, and tool execution metadata.</p>
+                <code>http://localhost:3000</code>
+              </article>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
