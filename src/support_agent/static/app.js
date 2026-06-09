@@ -2,14 +2,14 @@ const form = document.querySelector("#chat-form");
 const input = document.querySelector("#message-input");
 const messages = document.querySelector("#messages");
 const sendButton = document.querySelector("#send-button");
-const exampleButtons = document.querySelectorAll("[data-example]");
 const tabButtons = document.querySelectorAll("[data-view]");
 const views = document.querySelectorAll(".view");
 const tableSelect = document.querySelector("#table-select");
 const dataTable = document.querySelector("#data-table");
 const activeDb = document.querySelector("#active-db");
-const dbUpload = document.querySelector("#db-upload");
-const defaultDbButton = document.querySelector("#default-db-button");
+
+const DB_CACHE_KEY = "support-agent-default-db-snapshot";
+let cachedSnapshot = null;
 
 function appendMessage({ role, text, route, latencyMs, source, reason, error = false }) {
   const article = document.createElement("article");
@@ -94,34 +94,44 @@ async function sendMessage(message) {
   }
 }
 
-async function loadTables() {
-  await loadActiveDatabase();
-  const response = await fetch("/api/database/tables");
-  const data = await response.json();
+async function loadDatabaseSnapshot() {
+  try {
+    const response = await fetch("/api/database/snapshot", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Could not fetch database snapshot.");
+    }
+
+    cachedSnapshot = await response.json();
+    localStorage.setItem(DB_CACHE_KEY, JSON.stringify(cachedSnapshot));
+    activeDb.textContent = `Cached locally: ${cachedSnapshot.name} (${cachedSnapshot.version})`;
+  } catch (error) {
+    const cached = localStorage.getItem(DB_CACHE_KEY);
+    if (!cached) {
+      activeDb.textContent = "Database snapshot is unavailable.";
+      throw error;
+    }
+
+    cachedSnapshot = JSON.parse(cached);
+    activeDb.textContent = `Loaded from browser cache: ${cachedSnapshot.name} (${cachedSnapshot.version})`;
+  }
+
+  renderTableSelector();
+}
+
+function renderTableSelector() {
+  const tableNames = Object.keys(cachedSnapshot.tables);
   tableSelect.innerHTML = "";
 
-  data.tables.forEach((table) => {
+  tableNames.forEach((table) => {
     const option = document.createElement("option");
     option.value = table;
     option.textContent = table;
     tableSelect.appendChild(option);
   });
 
-  if (data.tables.length > 0) {
-    await loadTable(data.tables[0]);
+  if (tableNames.length > 0) {
+    renderTable(cachedSnapshot.tables[tableNames[0]]);
   }
-}
-
-async function loadActiveDatabase() {
-  const response = await fetch("/api/database/active");
-  const data = await response.json();
-  activeDb.textContent = `Active database: ${data.name} (${data.path})`;
-}
-
-async function loadTable(tableName) {
-  const response = await fetch(`/api/database/${tableName}`);
-  const data = await response.json();
-  renderTable(data.rows);
 }
 
 function renderTable(rows) {
@@ -166,14 +176,6 @@ form.addEventListener("submit", (event) => {
   void sendMessage(message);
 });
 
-exampleButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const message = button.dataset.example;
-    input.value = message;
-    input.focus();
-  });
-});
-
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
     tabButtons.forEach((tab) => tab.classList.remove("active"));
@@ -184,40 +186,7 @@ tabButtons.forEach((button) => {
 });
 
 tableSelect.addEventListener("change", () => {
-  void loadTable(tableSelect.value);
+  renderTable(cachedSnapshot.tables[tableSelect.value]);
 });
 
-dbUpload.addEventListener("change", async () => {
-  const file = dbUpload.files[0];
-  if (!file) {
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  try {
-    const response = await fetch("/api/database/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Upload failed.");
-    }
-
-    await loadTables();
-  } catch (error) {
-    alert(error.message);
-  } finally {
-    dbUpload.value = "";
-  }
-});
-
-defaultDbButton.addEventListener("click", async () => {
-  await fetch("/api/database/default", { method: "POST" });
-  await loadTables();
-});
-
-void loadTables();
+void loadDatabaseSnapshot();

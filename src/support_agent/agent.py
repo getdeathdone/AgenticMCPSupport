@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from difflib import SequenceMatcher
 import json
 import os
 import re
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from support_agent.config import get_settings
 from support_agent.db_setup import initialize_database
+from support_agent.knowledge_base import search_knowledge_base
 
 
 class Route(StrEnum):
@@ -74,6 +76,11 @@ class AgentResponse(BaseModel):
 TICKET_PATTERN = re.compile(r"(?:ticket|case|issue)\s*#?\s*(\d{3,})", re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 KNOWN_SERVICES = ("vpn", "email", "jira", "payments-api")
+TICKET_WORDS = ("ticket", "case", "issue")
+SERVICE_STATUS_WORDS = ("down", "status", "outage", "incident", "healthy", "working")
+DEVICE_WORDS = ("device", "laptop", "computer", "hostname")
+INCIDENT_WORDS = ("incident", "outage")
+FUZZY_THRESHOLD = 0.78
 
 
 def build_langfuse_config() -> RunnableConfig:
@@ -102,30 +109,33 @@ async def classify_request(state: AgentState) -> AgentState:
 
     user_input = state["user_input"]
     normalized = user_input.lower()
-    ticket_match = TICKET_PATTERN.search(user_input)
+    terms = _tokenize(user_input)
+    ticket_id = _extract_ticket_id(user_input)
     email_match = EMAIL_PATTERN.search(user_input)
-    service_name = _extract_service_name(normalized)
+    service_name = _extract_service_name(normalized, terms)
 
-    if ticket_match:
+    if ticket_id is not None:
         classification = Classification(
             route=Route.TOOL,
             tool_name=ToolName.TICKET_STATUS,
-            ticket_id=int(ticket_match.group(1)),
-            reason="The user asked for the status of a specific support ticket.",
+            ticket_id=ticket_id,
+            reason="The user asked for the status of a specific support ticket, allowing for minor typos.",
         )
-    elif service_name and any(word in normalized for word in ("down", "status", "outage", "incident", "healthy", "working")):
+    elif service_name and _contains_fuzzy(terms, SERVICE_STATUS_WORDS):
         classification = Classification(
             route=Route.TOOL,
-            tool_name=ToolName.KNOWN_INCIDENTS if "incident" in normalized else ToolName.SERVICE_STATUS,
+            tool_name=ToolName.KNOWN_INCIDENTS
+            if _contains_fuzzy(terms, INCIDENT_WORDS)
+            else ToolName.SERVICE_STATUS,
             service_name=service_name,
-            reason="The user asked about a specific IT service state.",
+            reason="The user asked about a specific IT service state, allowing for minor typos.",
         )
-    elif email_match and any(word in normalized for word in ("device", "laptop", "computer", "hostname")):
+    elif email_match and _contains_fuzzy(terms, DEVICE_WORDS):
         classification = Classification(
             route=Route.TOOL,
             tool_name=ToolName.USER_DEVICES,
             email=email_match.group(0),
-            reason="The user asked for endpoint device data tied to a user.",
+            reason="The user asked for endpoint device data tied to a user, allowing for minor typos.",
         )
     else:
         classification = Classification(
@@ -137,7 +147,19 @@ async def classify_request(state: AgentState) -> AgentState:
 
 
 async def knowledge_base_node(state: AgentState) -> AgentState:
-    """Retrieve a matching support knowledge article from SQLite."""
+    """Retrieve a matching support document, falling back to SQLite articles."""
+
+    document = search_knowledge_base(state["user_input"])
+    if document is not None:
+        return {
+            "rag_source": {
+                "title": document.title,
+                "source": document.source,
+                "content": document.content,
+            },
+            "answer": f"{document.title}: {document.content}",
+            "source": f"Markdown knowledge base: {document.source}",
+        }
 
     article = await _find_knowledge_article(state["user_input"])
     if article is None:
@@ -261,20 +283,61 @@ def route_after_tool(state: AgentState) -> Literal["format_tool", "fallback"]:
     return "format_tool" if result.get("ok") is True else "fallback"
 
 
-def _extract_service_name(normalized_input: str) -> str | None:
-    """Extract a known service name from user input."""
+def _extract_service_name(normalized_input: str, terms: set[str]) -> str | None:
+    """Extract a known service name from user input, allowing minor typos."""
 
     for service_name in KNOWN_SERVICES:
         if service_name in normalized_input:
             return service_name
+        if _contains_fuzzy(terms, (service_name,)):
+            return service_name
     return None
+
+
+def _extract_ticket_id(user_input: str) -> int | None:
+    """Extract a ticket id even when the ticket keyword contains a typo."""
+
+    direct_match = TICKET_PATTERN.search(user_input)
+    if direct_match:
+        return int(direct_match.group(1))
+
+    tokens = re.findall(r"[a-zA-Z]+|#?\d{3,}", user_input.lower())
+    for index, token in enumerate(tokens[:-1]):
+        if _is_fuzzy_match(token, TICKET_WORDS):
+            id_match = re.search(r"\d{3,}", tokens[index + 1])
+            if id_match:
+                return int(id_match.group(0))
+    return None
+
+
+def _tokenize(text: str) -> set[str]:
+    """Tokenize user input for fuzzy matching."""
+
+    return {term for term in re.findall(r"[a-z0-9-]+", text.lower()) if len(term) > 1}
+
+
+def _contains_fuzzy(terms: set[str], candidates: tuple[str, ...]) -> bool:
+    """Return whether any term approximately matches a candidate."""
+
+    return any(_is_fuzzy_match(term, candidates) for term in terms)
+
+
+def _is_fuzzy_match(term: str, candidates: tuple[str, ...]) -> bool:
+    """Return whether a token is close enough to one of the expected words."""
+
+    for candidate in candidates:
+        if term == candidate or candidate in term or term in candidate:
+            return True
+        if SequenceMatcher(None, term, candidate).ratio() >= FUZZY_THRESHOLD:
+            return True
+    return False
 
 
 async def _find_knowledge_article(user_input: str) -> dict[str, Any] | None:
     """Find the most relevant knowledge article with simple keyword scoring."""
 
     await initialize_database()
-    terms = {term for term in re.findall(r"[a-z0-9-]+", user_input.lower()) if len(term) > 2}
+    terms = {term for term in _tokenize(user_input) if len(term) > 2}
     async with aiosqlite.connect(get_settings().support_db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
@@ -288,6 +351,7 @@ async def _find_knowledge_article(user_input: str) -> dict[str, Any] | None:
         searchable = set(row["keywords"].lower().replace(",", " ").split())
         searchable.update(row["title"].lower().split())
         score = len(terms.intersection(searchable))
+        score += sum(1 for term in terms if _contains_fuzzy(searchable, (term,)))
         if score > best_score:
             best_score = score
             best_row = row

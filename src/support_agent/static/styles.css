@@ -121,16 +121,18 @@ h3 {
 }
 
 .status-grid strong {
+  display: block;
+  margin-bottom: 8px;
   font-size: 0.95rem;
 }
 
-.examples {
-  margin-top: auto;
-  display: grid;
-  gap: 10px;
+.status-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.38;
 }
 
-.examples button,
 .composer button,
 .tab {
   min-height: 42px;
@@ -138,15 +140,6 @@ h3 {
   cursor: pointer;
 }
 
-.examples button {
-  padding: 0 14px;
-  text-align: left;
-  color: var(--ink);
-  background: #ffffff;
-  border: 1px solid var(--line);
-}
-
-.examples button:hover,
 .composer button:hover,
 .tab:hover {
   filter: brightness(0.97);
@@ -348,31 +341,8 @@ h3 {
 }
 
 .panel-header select,
-.database-controls button,
-.file-button {
+.database-controls {
   width: min(280px, 100%);
-}
-
-.database-controls button,
-.file-button {
-  width: auto;
-  min-height: 44px;
-  padding: 0 14px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--ink);
-  background: #ffffff;
-  cursor: pointer;
-}
-
-#db-upload {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .active-db {
@@ -475,11 +445,6 @@ code {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .examples {
-    margin-top: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .main-panel {
     min-height: 720px;
   }
@@ -493,7 +458,6 @@ code {
   }
 
   .status-grid,
-  .examples,
   .composer,
   .source-grid {
     grid-template-columns: 1fr;
@@ -509,8 +473,7 @@ code {
     justify-content: stretch;
   }
 
-  .database-controls button,
-  .file-button,
+  .database-controls,
   .panel-header select {
     width: 100%;
   }

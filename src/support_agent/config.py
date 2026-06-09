@@ -22,6 +22,15 @@ class Settings(BaseSettings):
         default=True,
         validation_alias="SUPPORT_DB_SEED_ENABLED",
     )
+    environment: str = Field(default="local", validation_alias="ENVIRONMENT")
+    database_upload_enabled: bool = Field(
+        default=False,
+        validation_alias="DATABASE_UPLOAD_ENABLED",
+    )
+    database_upload_password: str | None = Field(
+        default=None,
+        validation_alias="DATABASE_UPLOAD_PASSWORD",
+    )
     langfuse_host: str = Field(default="http://localhost:3000", validation_alias="LANGFUSE_HOST")
     langfuse_public_key: str | None = Field(default=None, validation_alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str | None = Field(default=None, validation_alias="LANGFUSE_SECRET_KEY")
@@ -34,6 +43,10 @@ def get_settings() -> Settings:
     settings = Settings()
     os.environ.setdefault("SUPPORT_DB_PATH", str(settings.support_db_path))
     os.environ.setdefault("SUPPORT_DB_SEED_ENABLED", str(settings.support_db_seed_enabled).lower())
+    os.environ.setdefault("ENVIRONMENT", settings.environment)
+    os.environ.setdefault("DATABASE_UPLOAD_ENABLED", str(settings.database_upload_enabled).lower())
+    if settings.database_upload_password:
+        os.environ.setdefault("DATABASE_UPLOAD_PASSWORD", settings.database_upload_password)
     os.environ.setdefault("LANGFUSE_HOST", settings.langfuse_host)
     if settings.langfuse_public_key:
         os.environ.setdefault("LANGFUSE_PUBLIC_KEY", settings.langfuse_public_key)

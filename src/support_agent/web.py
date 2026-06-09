@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from secrets import compare_digest
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from support_agent.agent import AgentResponse, run_agent
+from support_agent.config import get_settings
 from support_agent.db_setup import fetch_table, initialize_database
 from support_agent.db_runtime import (
     UPLOAD_DB_PATH,
@@ -18,6 +20,7 @@ from support_agent.db_runtime import (
     use_uploaded_database,
     validate_sqlite_database,
 )
+from support_agent.knowledge_base import KNOWLEDGE_BASE_DIR
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -50,6 +53,25 @@ class DatabaseInfoResponse(BaseModel):
     name: str
     is_default: bool
     seed_enabled: bool
+    cache_scope: str = "browser"
+
+
+class UploadConfigResponse(BaseModel):
+    """Database upload availability metadata for the UI."""
+
+    enabled: bool
+    requires_password: bool
+    environment: str
+
+
+class DatabaseSnapshotResponse(BaseModel):
+    """Read-only browser-cacheable snapshot of the default support database."""
+
+    name: str
+    version: str
+    cache_scope: str
+    tables: dict[str, list[dict[str, object]]]
+    documents: list[str]
 
 
 @app.on_event("startup")
@@ -89,6 +111,35 @@ async def database_tables() -> dict[str, list[str]]:
     }
 
 
+@app.get("/api/database/upload-config", response_model=UploadConfigResponse)
+async def database_upload_config() -> UploadConfigResponse:
+    """Return upload availability for the current environment."""
+
+    settings = get_settings()
+    return UploadConfigResponse(
+        enabled=settings.database_upload_enabled,
+        requires_password=bool(settings.database_upload_password),
+        environment=settings.environment,
+    )
+
+
+@app.get("/api/database/snapshot", response_model=DatabaseSnapshotResponse)
+async def database_snapshot() -> DatabaseSnapshotResponse:
+    """Return a read-only snapshot that the browser can cache locally."""
+
+    tables = {}
+    for table_name in _support_table_names():
+        tables[table_name] = await fetch_table(table_name)
+
+    return DatabaseSnapshotResponse(
+        name="support.db",
+        version="support-demo-v1",
+        cache_scope="browser-local-cache",
+        tables=tables,
+        documents=_knowledge_document_names(),
+    )
+
+
 @app.get("/api/database/active", response_model=DatabaseInfoResponse)
 async def active_database() -> DatabaseInfoResponse:
     """Return the currently selected support database."""
@@ -97,17 +148,25 @@ async def active_database() -> DatabaseInfoResponse:
 
 
 @app.post("/api/database/default", response_model=DatabaseInfoResponse)
-async def select_default_database() -> DatabaseInfoResponse:
+async def select_default_database(
+    x_upload_password: str | None = Header(default=None),
+) -> DatabaseInfoResponse:
     """Switch back to the seeded default support database."""
 
+    _authorize_database_mutation(x_upload_password)
     info = use_default_database()
     await initialize_database()
     return DatabaseInfoResponse(**info)
 
 
 @app.post("/api/database/upload", response_model=DatabaseInfoResponse)
-async def upload_database(file: UploadFile = File(...)) -> DatabaseInfoResponse:
+async def upload_database(
+    file: UploadFile = File(...),
+    x_upload_password: str | None = Header(default=None),
+) -> DatabaseInfoResponse:
     """Upload a local SQLite database and switch the app to it."""
+
+    _authorize_database_mutation(x_upload_password)
 
     if not file.filename or not file.filename.lower().endswith((".db", ".sqlite", ".sqlite3")):
         raise HTTPException(status_code=400, detail="Upload a .db, .sqlite, or .sqlite3 file.")
@@ -128,6 +187,43 @@ async def upload_database(file: UploadFile = File(...)) -> DatabaseInfoResponse:
     info = use_uploaded_database(UPLOAD_DB_PATH)
     await initialize_database(UPLOAD_DB_PATH)
     return DatabaseInfoResponse(**info)
+
+
+def _authorize_database_mutation(provided_password: str | None) -> None:
+    """Authorize database upload/default mutations."""
+
+    settings = get_settings()
+    if not settings.database_upload_enabled:
+        raise HTTPException(status_code=403, detail="Database upload is disabled.")
+    if settings.database_upload_password and not (
+        provided_password
+        and compare_digest(provided_password, settings.database_upload_password)
+    ):
+        raise HTTPException(status_code=401, detail="Invalid database upload password.")
+
+
+def _support_table_names() -> list[str]:
+    """Return support tables exposed in the public read-only snapshot."""
+
+    return [
+        "tickets",
+        "services",
+        "incidents",
+        "users",
+        "devices",
+        "knowledge_articles",
+    ]
+
+
+def _knowledge_document_names() -> list[str]:
+    """Return markdown knowledge documents included in the RAG source set."""
+
+    if not KNOWLEDGE_BASE_DIR.exists():
+        return []
+    return [
+        str(path.relative_to(KNOWLEDGE_BASE_DIR.parent)).replace("\\", "/")
+        for path in sorted(KNOWLEDGE_BASE_DIR.glob("*.md"))
+    ]
 
 
 @app.get("/api/database/{table_name}", response_model=TableResponse)

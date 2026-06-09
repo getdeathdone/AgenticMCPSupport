@@ -19,30 +19,18 @@
             <div>
               <span>Router</span>
               <strong>RAG or MCP</strong>
+              <p>Classifies each message and sends it either to the knowledge base or to a tool workflow.</p>
             </div>
             <div>
               <span>Database</span>
               <strong>support.db</strong>
+              <p>Local SQLite source with tickets, services, incidents, users, devices, and runbooks.</p>
             </div>
             <div>
               <span>Tools</span>
               <strong>4 MCP tools</strong>
+              <p>Ticket status, service health, known incidents, and user device lookup via MCP.</p>
             </div>
-          </div>
-
-          <div class="examples" aria-label="Example prompts">
-            <button type="button" data-example="How do I troubleshoot VPN login?">
-              VPN runbook
-            </button>
-            <button type="button" data-example="What is the status of ticket #2041?">
-              Ticket #2041
-            </button>
-            <button type="button" data-example="Is Jira down right now?">
-              Jira status
-            </button>
-            <button type="button" data-example="Show devices for grace@example.com">
-              User devices
-            </button>
           </div>
         </aside>
 
@@ -69,7 +57,7 @@
                 name="message"
                 type="text"
                 autocomplete="off"
-                placeholder="Ask: What is the status of ticket #2041?"
+                placeholder="Ask your IT support question..."
                 maxlength="1000"
                 required
               />
@@ -82,13 +70,10 @@
               <div>
                 <p class="eyebrow">SQLite preview</p>
                 <h2>Support Database</h2>
-                <p id="active-db" class="active-db">Active database: loading...</p>
+                <p id="active-db" class="active-db">Caching default database snapshot...</p>
               </div>
               <div class="database-controls">
                 <select id="table-select" aria-label="Select database table"></select>
-                <label class="file-button" for="db-upload">Upload DB</label>
-                <input id="db-upload" type="file" accept=".db,.sqlite,.sqlite3" />
-                <button id="default-db-button" type="button">Use default</button>
               </div>
             </header>
             <div class="table-wrap">
@@ -110,8 +95,8 @@
             <div class="source-grid">
               <article class="source-card">
                 <h3>RAG route</h3>
-                <p>General troubleshooting questions use the SQLite table <strong>knowledge_articles</strong>.</p>
-                <code>vpn, password, email, device runbooks</code>
+                <p>General troubleshooting questions search markdown docs first, then fall back to SQLite articles.</p>
+                <code>knowledge_base/*.md</code>
               </article>
               <article class="source-card">
                 <h3>MCP ticket tool</h3>
