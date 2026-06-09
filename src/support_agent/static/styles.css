@@ -42,18 +42,17 @@ select {
   margin: 0 auto;
   padding: 28px 0;
   display: grid;
-  align-items: center;
+  align-items: start;
 }
 
 .workspace {
-  height: min(840px, calc(100vh - 56px));
-  min-height: 660px;
+  min-height: calc(100vh - 56px);
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 24px 80px rgba(23, 32, 42, 0.12);
 }
 
