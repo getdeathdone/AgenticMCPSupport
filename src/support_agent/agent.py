@@ -55,6 +55,7 @@ class AgentState(TypedDict, total=False):
     """Shared state passed between LangGraph nodes."""
 
     user_input: str
+    session_context: dict[str, Any]
     classification: Classification
     tool_result: dict[str, Any]
     rag_source: dict[str, Any]
@@ -149,6 +150,25 @@ async def classify_request(state: AgentState) -> AgentState:
 async def knowledge_base_node(state: AgentState) -> AgentState:
     """Retrieve a matching support document, falling back to SQLite articles."""
 
+    context_document = _document_from_session_context(state.get("session_context", {}))
+    if context_document is not None:
+        return {
+            "rag_source": context_document,
+            "answer": (
+                f"{context_document['name']}: {context_document.get('heading', 'Local document')}: "
+                f"{context_document['content']}"
+            ),
+            "source": f"Browser session context: local document {context_document['name']}",
+        }
+
+    context_article = _knowledge_article_from_session_context(state.get("session_context", {}))
+    if context_article is not None:
+        return {
+            "rag_source": context_article,
+            "answer": f"{context_article['title']}: {context_article['content']}",
+            "source": "Browser session context: locally cached knowledge_articles",
+        }
+
     document = search_knowledge_base(state["user_input"])
     if document is not None:
         return {
@@ -184,6 +204,13 @@ async def call_support_tool_node(state: AgentState) -> AgentState:
     classification = state["classification"]
     if classification.tool_name is None:
         return {"tool_result": _tool_error("No MCP tool was selected.")}
+
+    context_result = _tool_result_from_session_context(classification, state.get("session_context", {}))
+    if context_result is not None:
+        return {
+            "tool_result": context_result,
+            "source": "Browser session context: locally cached database snapshot",
+        }
 
     settings = get_settings()
     await initialize_database(settings.support_db_path)
@@ -371,6 +398,71 @@ def _tool_args(classification: Classification) -> dict[str, Any]:
     return {}
 
 
+def _tool_result_from_session_context(
+    classification: Classification,
+    session_context: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return a tool-shaped response from browser-provided session context."""
+
+    rows = session_context.get("rows", {}) if isinstance(session_context, dict) else {}
+    if not isinstance(rows, dict):
+        return None
+
+    if classification.tool_name == ToolName.TICKET_STATUS:
+        ticket = _first_row(rows.get("tickets"))
+        return {"ok": True, "ticket": ticket} if ticket else None
+
+    if classification.tool_name == ToolName.SERVICE_STATUS:
+        service = _first_row(rows.get("services"))
+        return {"ok": True, "service": service} if service else None
+
+    if classification.tool_name == ToolName.KNOWN_INCIDENTS:
+        incidents = rows.get("incidents")
+        if isinstance(incidents, list):
+            return {"ok": True, "incidents": incidents}
+        return None
+
+    if classification.tool_name == ToolName.USER_DEVICES:
+        devices = rows.get("devices")
+        if isinstance(devices, list) and devices:
+            return {"ok": True, "devices": devices}
+        return None
+
+    return None
+
+
+def _first_row(value: Any) -> dict[str, Any] | None:
+    """Return the first row from a list-like session context value."""
+
+    if isinstance(value, list) and value and isinstance(value[0], dict):
+        return value[0]
+    return None
+
+
+def _knowledge_article_from_session_context(
+    session_context: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return the best browser-provided knowledge article when available."""
+
+    rows = session_context.get("rows", {}) if isinstance(session_context, dict) else {}
+    if not isinstance(rows, dict):
+        return None
+
+    article = _first_row(rows.get("knowledge_articles"))
+    return article
+
+
+def _document_from_session_context(
+    session_context: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Return the best browser-provided local document chunk when available."""
+
+    documents = session_context.get("documents", []) if isinstance(session_context, dict) else []
+    if isinstance(documents, list) and documents and isinstance(documents[0], dict):
+        return documents[0]
+    return None
+
+
 def _tool_error(message: str, exc: Exception | None = None) -> dict[str, Any]:
     """Return a stable MCP failure payload."""
 
@@ -426,13 +518,20 @@ def build_graph() -> Any:
     return graph.compile()
 
 
-async def run_agent(user_input: str) -> AgentResponse:
+async def run_agent(
+    user_input: str,
+    session_context: dict[str, Any] | None = None,
+) -> AgentResponse:
     """Run the IT support agent for a single user input."""
 
     started_at = time.perf_counter()
     app = build_graph()
     result = await app.ainvoke(
-        {"user_input": user_input, "started_at": started_at},
+        {
+            "user_input": user_input,
+            "session_context": session_context or {},
+            "started_at": started_at,
+        },
         config=build_langfuse_config(),
     )
     latency_ms = int((time.perf_counter() - started_at) * 1000)

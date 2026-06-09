@@ -86,6 +86,12 @@ SUPPORT_DB_SEED_ENABLED=false
 
 The public UI does not expose upload or database switching. On page load, the browser downloads `/api/database/snapshot` and caches the default database snapshot in `localStorage`. If the user clears browser storage, the snapshot is downloaded again from the site.
 
+When a chat message is sent, the browser extracts only relevant rows from that local snapshot and sends them as temporary `session_context`. The server does not receive the full database file. If matching rows are present, the agent answers from `Browser session context`; otherwise it falls back to MCP tools, SQLite, and markdown docs.
+
+The Database tab includes local-only Add/Edit/Delete/Reset controls. Edits are stored in browser `localStorage`, affect only that browser session, and never mutate the server SQLite database.
+
+The Sources tab also supports local `.md`/`.txt` documents. Files are read in the browser, stored in `localStorage`, and only the most relevant chunks are sent as temporary `session_context`. The server never stores the uploaded local document files.
+
 If you intentionally need database upload for private admin maintenance, enable it and keep it password protected:
 
 ```env

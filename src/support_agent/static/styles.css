@@ -134,6 +134,13 @@ h3 {
 }
 
 .composer button,
+.database-controls button,
+.local-doc-actions button,
+.local-doc-item button,
+.row-actions button,
+.dialog-actions button,
+.file-button,
+.icon-button,
 .tab {
   min-height: 42px;
   border-radius: 8px;
@@ -141,6 +148,13 @@ h3 {
 }
 
 .composer button:hover,
+.database-controls button:hover,
+.local-doc-actions button:hover,
+.local-doc-item button:hover,
+.row-actions button:hover,
+.dialog-actions button:hover,
+.file-button:hover,
+.icon-button:hover,
 .tab:hover {
   filter: brightness(0.97);
 }
@@ -342,7 +356,15 @@ h3 {
 
 .panel-header select,
 .database-controls {
-  width: min(280px, 100%);
+  width: min(520px, 100%);
+}
+
+.database-controls button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #ffffff;
 }
 
 .active-db {
@@ -375,6 +397,106 @@ td {
   overflow-wrap: anywhere;
 }
 
+.row-actions {
+  min-width: 132px;
+  white-space: nowrap;
+}
+
+.row-actions button {
+  min-height: 34px;
+  margin-right: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.row-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(23, 32, 42, 0.24);
+}
+
+.row-dialog::backdrop {
+  background: rgba(23, 32, 42, 0.32);
+}
+
+.dialog-header {
+  padding: 18px 20px;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.icon-button {
+  width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.row-fields {
+  max-height: 500px;
+  padding: 18px 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.row-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.row-fields input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  outline: none;
+}
+
+.row-fields input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(22, 123, 143, 0.16);
+}
+
+.dialog-actions {
+  padding: 14px 20px;
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.dialog-actions button {
+  min-width: 92px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #ffffff;
+}
+
+#save-row-button {
+  border-color: var(--accent);
+  color: #ffffff;
+  background: var(--accent);
+}
+
 th {
   position: sticky;
   top: 0;
@@ -405,6 +527,57 @@ th {
   margin-bottom: 12px;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.local-docs-card {
+  grid-column: 1 / -1;
+}
+
+.local-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.local-doc-actions button,
+.file-button,
+.local-doc-item button {
+  min-height: 38px;
+  padding: 0 12px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #ffffff;
+  cursor: pointer;
+}
+
+#local-doc-upload {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.local-doc-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.local-doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
 }
 
 code {
@@ -476,6 +649,10 @@ code {
   .database-controls,
   .panel-header select {
     width: 100%;
+  }
+
+  .row-fields {
+    grid-template-columns: 1fr;
   }
 
   .tab,

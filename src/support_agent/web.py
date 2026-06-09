@@ -37,6 +37,7 @@ class ChatRequest(BaseModel):
     """Incoming chat request payload."""
 
     message: str = Field(min_length=1, max_length=1_000)
+    session_context: dict[str, object] | None = None
 
 
 class TableResponse(BaseModel):
@@ -241,7 +242,7 @@ async def chat(payload: ChatRequest) -> AgentResponse:
     """Run the support agent and return the answer with route metadata."""
 
     try:
-        return await run_agent(payload.message)
+        return await run_agent(payload.message, payload.session_context)
     except Exception as exc:
         raise HTTPException(
             status_code=500,

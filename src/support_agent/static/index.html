@@ -74,6 +74,8 @@
               </div>
               <div class="database-controls">
                 <select id="table-select" aria-label="Select database table"></select>
+                <button id="add-row-button" type="button">Add row</button>
+                <button id="reset-snapshot-button" type="button">Reset snapshot</button>
               </div>
             </header>
             <div class="table-wrap">
@@ -93,6 +95,16 @@
             </header>
 
             <div class="source-grid">
+              <article class="source-card local-docs-card">
+                <h3>Local docs</h3>
+                <p>Attach markdown or text docs for this browser only. They are not uploaded to the server.</p>
+                <div class="local-doc-actions">
+                  <label class="file-button" for="local-doc-upload">Add docs</label>
+                  <input id="local-doc-upload" type="file" accept=".md,.txt,text/markdown,text/plain" multiple />
+                  <button id="clear-local-docs-button" type="button">Clear docs</button>
+                </div>
+                <div id="local-doc-list" class="local-doc-list"></div>
+              </article>
               <article class="source-card">
                 <h3>RAG route</h3>
                 <p>General troubleshooting questions search markdown docs first, then fall back to SQLite articles.</p>
@@ -128,6 +140,23 @@
         </section>
       </section>
     </main>
+
+    <dialog id="row-dialog" class="row-dialog">
+      <form id="row-form" method="dialog">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Local session edit</p>
+            <h2 id="row-dialog-title">Edit row</h2>
+          </div>
+          <button id="close-row-dialog" class="icon-button" type="button" aria-label="Close">x</button>
+        </header>
+        <div id="row-fields" class="row-fields"></div>
+        <footer class="dialog-actions">
+          <button id="cancel-row-button" type="button">Cancel</button>
+          <button id="save-row-button" type="submit">Save</button>
+        </footer>
+      </form>
+    </dialog>
 
     <script src="/static/app.js"></script>
   </body>
