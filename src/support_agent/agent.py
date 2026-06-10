@@ -81,6 +81,16 @@ TICKET_WORDS = ("ticket", "case", "issue")
 SERVICE_STATUS_WORDS = ("down", "status", "outage", "incident", "healthy", "working")
 DEVICE_WORDS = ("device", "laptop", "computer", "hostname")
 INCIDENT_WORDS = ("incident", "outage")
+HOW_TO_WORDS = (
+    "troubleshoot",
+    "troubleshooting",
+    "fix",
+    "resolve",
+    "steps",
+    "guide",
+    "runbook",
+)
+HOW_TO_PHRASES = ("how do", "how can", "what should")
 FUZZY_THRESHOLD = 0.78
 
 
@@ -114,6 +124,7 @@ async def classify_request(state: AgentState) -> AgentState:
     ticket_id = _extract_ticket_id(user_input)
     email_match = EMAIL_PATTERN.search(user_input)
     service_name = _extract_service_name(normalized, terms)
+    is_how_to = _is_how_to_request(normalized, terms)
 
     if ticket_id is not None:
         classification = Classification(
@@ -121,6 +132,11 @@ async def classify_request(state: AgentState) -> AgentState:
             tool_name=ToolName.TICKET_STATUS,
             ticket_id=ticket_id,
             reason="The user asked for the status of a specific support ticket, allowing for minor typos.",
+        )
+    elif is_how_to:
+        classification = Classification(
+            route=Route.RAG,
+            reason="The user asked a troubleshooting or how-to question for the knowledge base.",
         )
     elif service_name and _contains_fuzzy(terms, SERVICE_STATUS_WORDS):
         classification = Classification(
@@ -319,6 +335,15 @@ def _extract_service_name(normalized_input: str, terms: set[str]) -> str | None:
         if _contains_fuzzy(terms, (service_name,)):
             return service_name
     return None
+
+
+def _is_how_to_request(normalized_input: str, terms: set[str]) -> bool:
+    """Return whether the user is asking for guidance rather than live service state."""
+
+    return any(phrase in normalized_input for phrase in HOW_TO_PHRASES) or _contains_fuzzy(
+        terms,
+        HOW_TO_WORDS,
+    )
 
 
 def _extract_ticket_id(user_input: str) -> int | None:
