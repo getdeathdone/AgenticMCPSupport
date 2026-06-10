@@ -16,8 +16,9 @@ Production-style FastAPI + LangGraph demo for an autonomous IT support workflow.
 
 ## Local Setup
 
+Run these commands from `<project-root>\`, the repository root folder.
+
 ```powershell
-Set-Location D:\_AI\AgenticMCPSupport
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
